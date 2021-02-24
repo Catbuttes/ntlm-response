@@ -4,7 +4,8 @@
   "description": "An NTLM interrogator intended to be used with telegraf",
   "main": "build/app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc && mv build/app.js build/ntlm-response.js && pkg build/ntlm-response.js --targets node14-win-x64,node14-linux-x64,node14-macos-x64 --out-path dist/"
   },
   "author": "CatButtes",
   "license": "MIT",
