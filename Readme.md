@@ -9,7 +9,7 @@ An NTLM site checker for telegraf modeled after the http_response plugin.
         "https://www.google.com"
     ],
     "http_proxy": "",
-    "response_timeout": 5,
+    "response_timeout": 5000,
     "method": "GET",
     "username": "domain\\user",
     "password": "pass",
@@ -56,5 +56,5 @@ This tag is used to expose network and plugin errors. HTTP errors are considered
 |body_read_error |2 |The option response_string_match was used, but the plugin wasn't able to read the body of the response. |Responses with empty bodies (like 3xx, HEAD, etc) will trigger this error. Or the option response_body_field was used and the content of the response body was not a valid utf-8. Or the size of the body of the response exceeded the response_body_max_size
 |connection_failed |3 |Catch all for any network error not specifically handled by the plugin|
 |timeout |4 |The plugin timed out while awaiting the HTTP connection to complete|
-|dns_error |5 |There was a DNS error while attempting to connect to the host|
+|dns_error |5 |There was a DNS error while attempting to connect to the host (not returned)|
 |response_status_code_mismatch |6 |The option response_status_code_match was used, and the status code of the response didn't |match the value.
