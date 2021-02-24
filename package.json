@@ -1,0 +1,19 @@
+{
+  "name": "ntlm-response",
+  "version": "1.0.0",
+  "description": "An NTLM interrogator intended to be used with telegraf",
+  "main": "build/app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "CatButtes",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^14.14.31",
+    "pkg": "^4.4.9",
+    "typescript": "^4.2.2"
+  },
+  "dependencies": {
+    "axios-ntlm": "^1.1.4"
+  }
+}
