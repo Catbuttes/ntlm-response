@@ -1,6 +1,6 @@
 # ntlm-response
 
-An NTLM site checker for telegraf modeled after the http_response plugin.
+An NTLM site checker for telegraf with output modeled after the http_response plugin. This is designed to work with the [telegraf exec plugin](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/exec). 
 
 ## Configuration:
 ```json
@@ -29,7 +29,7 @@ An NTLM site checker for telegraf modeled after the http_response plugin.
 
 ## Metrics:
 
-    http_response
+    ntlm_response
         tags:
             server (target URL)
             method (request method)
