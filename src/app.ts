@@ -146,8 +146,6 @@ async function getRequest(client: AxiosInstance, request: AxiosRequestConfig) {
         metric = metric + ",response_time=" + duration
             + ",response_status_code_match=" + matchResponseCode(response)
             + ",response_string_match=" + matchResponseString(response)
-            + " "
-            + Date.now()
 
         console.log(metric);
 
