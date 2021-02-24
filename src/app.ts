@@ -1,5 +1,5 @@
 import { NtlmClient, NtlmCredentials } from 'axios-ntlm';
-import { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { readFileSync } from 'fs';
 
 interface config {
