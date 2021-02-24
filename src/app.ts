@@ -131,10 +131,10 @@ async function getRequest(client: AxiosInstance, request: AxiosRequestConfig) {
 
         metric = metric + " "
         if (response !== undefined) {
-            metric = metric + ",content_length=" + response.data.length + "i"
+            metric = metric + "content_length=" + response.data.length + "i"
         }
         else {
-            metric = metric + ",content_length=0"
+            metric = metric + "content_length=0"
         }
 
         if (response !== undefined) {
