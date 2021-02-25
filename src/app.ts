@@ -16,6 +16,7 @@ interface config {
     response_string_match?: string;
     response_status_code?: number;
     headers?: { [header: string]: string };
+    http_header_metrics?: { [header: string]: string };
     http_header_tags?: { [header: string]: string };
 }
 
@@ -37,6 +38,7 @@ Sample Config:
     "method": "get",
     "username": "domain\\username",
     "password": "password",
+    "workstation": "",
     "body": "",
     "response_body_field": "",
     "response_body_max_size": "",
@@ -44,6 +46,9 @@ Sample Config:
     "response_status_code": 0,
     "headers": {
         "Host": "githubcom"
+    },
+    "http_header_metrics": {
+        "HTTP_HEADER": "METRIC_NAME"
     },
     "http_header_tags": {
         "HTTP_HEADER": "TAG_NAME"
@@ -54,7 +59,7 @@ Source: https://github.com/Catbuttes/ntlm-response
 `
     );
 
-process.exit(1);
+    process.exit(1);
 }
 
 let configFile = process.argv[2].toString();
@@ -149,6 +154,25 @@ async function getRequest(client: AxiosInstance, request: AxiosRequestConfig) {
             + ",response_status_code_match=" + matchResponseCode(response)
             + ",response_string_match=" + matchResponseString(response)
             + ",result_code=" + getResult(response)
+
+        if (response !== undefined && config.http_header_metrics !== undefined) {
+            for (let header in config.http_header_metrics) {
+                if (Object.prototype.hasOwnProperty.call(config.http_header_metrics, header)) {
+                    let header_metric = config.http_header_metrics[header];
+                    if (response.headers[header] !== undefined) {
+                        if (header_metric.endsWith("_s")) {
+                            metric = metric + "," + header_metric.substring(0, header_metric.length - 2) + "=\"" + response.headers[header].toString() + "\"";
+                        }
+                        else if (header_metric.endsWith("_i")) {
+                            metric = metric + "," + header_metric.substring(0, header_metric.length - 2) + "=" + response.headers[header].toString() + "i";
+                        }
+                        else {
+                            metric = metric + "," + header_metric + "=" + response.headers[header].toString();
+                        }
+                    }
+                }
+            }
+        }
 
         console.log(metric);
 
