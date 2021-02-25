@@ -9,6 +9,7 @@ interface config {
     method?: "GET" | "get" | "delete" | "DELETE" | "head" | "HEAD" | "options" | "OPTIONS" | "post" | "POST" | "put" | "PUT" | "patch" | "PATCH" | "purge" | "PURGE" | "link" | "LINK" | "unlink" | "UNLINK";
     username: string;
     password: string;
+    workstation?: string;
     body?: string;
     response_body_field?: string;
     response_body_max_size?: string;
@@ -66,7 +67,8 @@ let config: config = JSON.parse(configString.toString());
     let creds: NtlmCredentials = {
         domain: splitCreds[0],
         username: splitCreds[1],
-        password: config.password
+        password: config.password,
+        workstation: config.workstation
     };
 
     let client = NtlmClient(creds);
