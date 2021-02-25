@@ -5,21 +5,27 @@ An NTLM site checker for telegraf with output modeled after the http_response pl
 ## Configuration:
 ```json
 {
-"urls": [
+    "urls": [
         "https://www.google.com"
     ],
     "http_proxy": "",
     "response_timeout": 5000,
-    "method": "GET",
-    "username": "domain\\user",
-    "password": "pass",
+    "method": "get",
+    "username": "domain\\username",
+    "password": "password",
+    "workstation": "",
     "body": "",
     "response_body_field": "",
     "response_body_max_size": "",
     "response_string_match": "",
     "response_status_code": 0,
     "headers": {
-        "Host": "github.com"
+        "Host": "githubcom"
+    },
+    "http_header_metrics": {
+        "HTTP_HEADER": "INTEGER_METRIC_NAME_i",
+        "HTTP_HEADER": "STRING_METRIC_NAME_s",
+        "HTTP_HEADER": "FLOAT_METRIC_NAME"
     },
     "http_header_tags": {
         "HTTP_HEADER": "TAG_NAME"
@@ -58,3 +64,7 @@ This tag is used to expose network and plugin errors. HTTP errors are considered
 |timeout |4 |The plugin timed out while awaiting the HTTP connection to complete|
 |dns_error |5 |There was a DNS error while attempting to connect to the host (not returned)|
 |response_status_code_mismatch |6 |The option response_status_code_match was used, and the status code of the response didn't |match the value.
+
+## Additions from http_response
+
+This does have one addition that is missing from http_response. It will allow you to specify optional header fields to return as metrics - as well as tags. This is intended for servers like SharePoint which will return some metrics in their http response headers. This is done using the `http_header_metrics` mapping. To specify the metric type (integer, string or float) simply add the appropriate suffix to the metric name. This will be removed when the metrics are returned.
