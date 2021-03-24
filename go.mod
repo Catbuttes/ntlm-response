@@ -4,6 +4,5 @@ go 1.16
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20200615164410-66371956d46c
-	github.com/koltyakov/gosip v0.0.0-20210116122858-f3adcc821533 // indirect
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2 // indirect
 )
