@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,6 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,7 +21,7 @@ type Config struct {
 	Urls                []string          `json:"urls"`
 	HTTPProxy           string            `json:"http_proxy"`
 	Interface           string            `json:"interface"`
-	ResponseTimeout     int               `json:"response_timeout"`
+	ResponseTimeout     float64           `json:"response_timeout"`
 	Method              string            `json:"method"`
 	Username            string            `json:"username"`
 	Password            string            `json:"password"`
@@ -50,6 +53,9 @@ func main() {
 }
 
 func checkUrl(urlId int, config Config, wg *sync.WaitGroup) {
+	tags := make(map[string]string)
+	metrics := make(map[string]string)
+
 	addr, err := url.Parse(config.Urls[urlId])
 	if err != nil {
 		fmt.Print(err)
@@ -62,6 +68,9 @@ func checkUrl(urlId int, config Config, wg *sync.WaitGroup) {
 		fmt.Println("")
 		os.Exit(-1)
 	}
+
+	tags["method"] = config.Method
+	tags["server"] = addr.String()
 
 	dialer := &net.Dialer{}
 
@@ -94,40 +103,147 @@ func checkUrl(urlId int, config Config, wg *sync.WaitGroup) {
 				DialContext: dialer.DialContext,
 			},
 			Workstation: config.Workstation,
+			Username:    config.Username,
+			Password:    config.Password,
 		},
 		Timeout: time.Duration(config.ResponseTimeout) * time.Second,
 	}
 	method := strings.ToUpper(config.Method)
 	req, _ := http.NewRequest(method, config.Urls[urlId], nil)
-	req.SetBasicAuth(config.Username, config.Password)
+	//req.SetBasicAuth(config.Username, config.Password)
 
 	for key, value := range config.Headers {
 		req.Header.Add(key, value)
 	}
 
+	if config.Body != "" {
+		req.Body = ioutil.NopCloser(bytes.NewReader([]byte(config.Body)))
+	}
+
+	start := time.Now()
 	res, err := client.Do(req)
+	responseTime := time.Since(start).Seconds()
+	metrics["response_time"] = strconv.FormatFloat(responseTime, 'f', 5, 64)
 	if err != nil {
-		fmt.Print(err)
-		fmt.Println("")
-		os.Exit(-1)
+		if timeoutError, ok := err.(net.Error); ok && timeoutError.Timeout() {
+			tags["result"] = "timeout"
+			metrics["result_code"] = "4"
+		} else {
+			urlErr, isURLErr := err.(*url.Error)
+			if isURLErr {
+
+				opErr, isNetErr := (urlErr.Err).(*net.OpError)
+				if isNetErr {
+					switch (opErr.Err).(type) {
+					case (*net.DNSError):
+						tags["result"] = "dns_error"
+						metrics["result_code"] = "5"
+					case (*net.ParseError):
+						tags["result"] = "connection_failed"
+						metrics["result_code"] = "3"
+					default:
+						tags["result"] = "connection_failed"
+						metrics["result_code"] = "3"
+					}
+				}
+			}
+		}
+	} else {
+		defer res.Body.Close()
+
+		tags["status_code"] = strconv.Itoa(res.StatusCode)
+		metrics["http_response_code"] = strconv.Itoa(res.StatusCode) + "i"
+
+		if config.ResponseStatusCode > 0 {
+			if res.StatusCode != config.ResponseStatusCode {
+				if tags["result"] == "" {
+					tags["result"] = "response_status_code_mismatch"
+					metrics["result_code"] = "6"
+				}
+			}
+		}
+
+		for headerName, tag := range config.HTTPHeaderTags {
+			headerValues, foundHeader := res.Header[headerName]
+			if foundHeader && len(headerValues) > 0 {
+				tags[tag] = strings.Join(headerValues, " ")
+			}
+		}
+
+		for headerName, metric := range config.HTTPHeaderMetrics {
+			headerValues, foundHeader := res.Header[headerName]
+			if foundHeader && len(headerValues) > 0 {
+				metrics[metric] = strings.Join(headerValues, " ")
+			}
+		}
+
+		data, err := ioutil.ReadAll(res.Body)
+		if err == nil {
+			metrics["content_length"] = strconv.Itoa(len(data)) + "i"
+
+			if config.ResponseBodyField != "" {
+				metrics[config.ResponseBodyField] = string(data)
+			}
+
+			if config.ResponseStringMatch != "" {
+				matched, err := regexp.Match(config.ResponseStringMatch, data)
+				if err != nil {
+					tags["result"] = "body_read_error"
+					metrics["result_code"] = "2"
+				}
+
+				if !matched {
+					if tags["result"] == "" {
+						tags["result"] = "response_string_mismatch"
+						metrics["result_code"] = "1"
+						metrics["response_string_match"] = "0"
+					}
+				}
+			}
+
+		} else {
+			if tags["result"] == "" {
+				tags["result"] = "body_read_error"
+				metrics["result_code"] = "2"
+			}
+		}
+
 	}
-	defer res.Body.Close()
 
-	fmt.Printf("%v\n", config.Password)
-	fmt.Printf("%v\n", config.Username)
-	fmt.Printf("%v\n", config.Workstation)
-	fmt.Printf("%v\n", req.Header)
-
-	data, err := ioutil.ReadAll(res.Body)
-	_ = data
-	if err != nil {
-		fmt.Print(err)
-		fmt.Println("")
-		os.Exit(-1)
+	if tags["result"] == "" {
+		tags["result"] = "success"
+		metrics["result_code"] = "0"
 	}
 
-	fmt.Printf("Status: %s\n", res.Status)
-	//fmt.Printf("%s\n", data)
+	delimiter := ","
+	fmt.Print("ntlm_response")
+
+	for key, value := range tags {
+		tagValue := strings.ReplaceAll(value, "=", "\\=")
+		tagValue = strings.ReplaceAll(tagValue, " ", "\\ ")
+		tagValue = strings.ReplaceAll(tagValue, ",", "\\,")
+
+		fmt.Printf("%s%s=%s", delimiter, key, tagValue)
+	}
+
+	delimiter = " "
+	for key, value := range metrics {
+		metricValue := strings.ReplaceAll(value, "=", "\\=")
+		metricValue = strings.ReplaceAll(metricValue, " ", "\\ ")
+		metricValue = strings.ReplaceAll(metricValue, ",", "\\,")
+
+		if strings.HasSuffix(key, "_s") {
+			fmt.Printf("%s%s=\"%s\"", delimiter, strings.TrimSuffix(key, "_s"), metricValue)
+		} else if strings.HasSuffix(key, "_i") {
+			fmt.Printf("%s%s=%si", delimiter, strings.TrimSuffix(key, "_i"), metricValue)
+		} else {
+			fmt.Printf("%s%s=%s", delimiter, key, metricValue)
+		}
+
+		delimiter = ","
+	}
+
+	fmt.Print("\n")
 
 	wg.Done()
 }

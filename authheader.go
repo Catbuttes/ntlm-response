@@ -12,11 +12,11 @@ func (h authheader) IsBasic() bool {
 }
 
 func (h authheader) IsNegotiate() bool {
-	return strings.HasPrefix(string(h), "Negotiate")
+	return strings.Contains(string(h), "Negotiate")
 }
 
 func (h authheader) IsNTLM() bool {
-	return strings.HasPrefix(string(h), "NTLM")
+	return strings.Contains(string(h), "NTLM")
 }
 
 func (h authheader) GetData() ([]byte, error) {

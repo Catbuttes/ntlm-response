@@ -11,21 +11,35 @@ import (
 	"github.com/Azure/go-ntlmssp"
 )
 
+// The contents of this file are shamelessly cribbed from the roundtripper at github.com/Azure/go-ntlmssp.
+// Some changes have been made to support specifying the workstation
+
 // GetDomain : parse domain name from based on slashes in the input
-func GetDomain(user string) (string, string) {
+func GetDomain(user string) string {
 	domain := ""
 
 	if strings.Contains(user, "\\") {
 		ucomponents := strings.SplitN(user, "\\", 2)
 		domain = ucomponents[0]
-		user = ucomponents[1]
 	}
-	return user, domain
+	return domain
+}
+
+func GetUsername(user string) string {
+	username := user
+
+	if strings.Contains(user, "\\") {
+		ucomponents := strings.SplitN(user, "\\", 2)
+		username = ucomponents[1]
+	}
+	return username
 }
 
 //NtlmNegotiator is a http.Roundtripper decorator that automatically
 //converts basic authentication to NTLM/Negotiate authentication when appropriate.
 type NtlmNegotiator struct {
+	Username    string
+	Password    string
 	Workstation string
 	http.RoundTripper
 }
@@ -38,11 +52,7 @@ func (l NtlmNegotiator) RoundTrip(req *http.Request) (res *http.Response, err er
 	if rt == nil {
 		rt = http.DefaultTransport
 	}
-	// If it is not basic auth, just round trip the request as usual
-	reqauth := authheader(req.Header.Get("Authorization"))
-	if !reqauth.IsBasic() {
-		return rt.RoundTrip(req)
-	}
+
 	// Save request body
 	body := bytes.Buffer{}
 	if req.Body != nil {
@@ -61,53 +71,28 @@ func (l NtlmNegotiator) RoundTrip(req *http.Request) (res *http.Response, err er
 	if err != nil {
 		return nil, err
 	}
+
 	if res.StatusCode != http.StatusUnauthorized {
 		return res, err
 	}
 
-	resauth := authheader(res.Header.Get("Www-Authenticate"))
-	if !resauth.IsNegotiate() && !resauth.IsNTLM() {
-		// Unauthorized, Negotiate not requested, let's try with basic auth
-		req.Header.Set("Authorization", string(reqauth))
-		io.Copy(ioutil.Discard, res.Body)
-		res.Body.Close()
-		req.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
+	resauth := authheader(strings.Join(res.Header.Values("Www-Authenticate"), " "))
 
-		res, err = rt.RoundTrip(req)
-		if err != nil {
-			return nil, err
-		}
-		if res.StatusCode != http.StatusUnauthorized {
-			return res, err
-		}
-		resauth = authheader(res.Header.Get("Www-Authenticate"))
-	}
-
-	if resauth.IsNegotiate() || resauth.IsNTLM() {
+	if resauth.IsNTLM() {
 		// 401 with request:Basic and response:Negotiate
 		io.Copy(ioutil.Discard, res.Body)
 		res.Body.Close()
 
-		// recycle credentials
-		u, p, err := reqauth.GetBasicCreds()
-		if err != nil {
-			return nil, err
-		}
-
 		// get domain from username
-		domain := ""
-		u, domain = GetDomain(u)
+		domain := GetDomain(l.Username)
 
 		// send negotiate
 		negotiateMessage, err := ntlmssp.NewNegotiateMessage(domain, l.Workstation)
 		if err != nil {
 			return nil, err
 		}
-		if resauth.IsNTLM() {
-			req.Header.Set("Authorization", "NTLM "+base64.StdEncoding.EncodeToString(negotiateMessage))
-		} else {
-			req.Header.Set("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(negotiateMessage))
-		}
+
+		req.Header.Set("Authorization", "NTLM "+base64.StdEncoding.EncodeToString(negotiateMessage))
 
 		req.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
 
@@ -117,32 +102,33 @@ func (l NtlmNegotiator) RoundTrip(req *http.Request) (res *http.Response, err er
 		}
 
 		// receive challenge?
-		resauth = authheader(res.Header.Get("Www-Authenticate"))
+		resauth = authheader(strings.Join(res.Header.Values("Www-Authenticate"), " "))
 		challengeMessage, err := resauth.GetData()
 		if err != nil {
 			return nil, err
 		}
-		if !(resauth.IsNegotiate() || resauth.IsNTLM()) || len(challengeMessage) == 0 {
+		if !(resauth.IsNTLM()) || len(challengeMessage) == 0 {
 			// Negotiation failed, let client deal with response
 			return res, nil
 		}
 		io.Copy(ioutil.Discard, res.Body)
 		res.Body.Close()
 
+		user := GetUsername(l.Username)
+
 		// send authenticate
-		authenticateMessage, err := ntlmssp.ProcessChallenge(challengeMessage, u, p)
+		authenticateMessage, err := ntlmssp.ProcessChallenge(challengeMessage, user, l.Password)
 		if err != nil {
 			return nil, err
 		}
-		if resauth.IsNTLM() {
-			req.Header.Set("Authorization", "NTLM "+base64.StdEncoding.EncodeToString(authenticateMessage))
-		} else {
-			req.Header.Set("Authorization", "Negotiate "+base64.StdEncoding.EncodeToString(authenticateMessage))
-		}
+
+		req.Header.Set("Authorization", "NTLM "+base64.StdEncoding.EncodeToString(authenticateMessage))
 
 		req.Body = ioutil.NopCloser(bytes.NewReader(body.Bytes()))
 
-		return rt.RoundTrip(req)
+		res, err := rt.RoundTrip(req)
+
+		return res, err
 	}
 
 	return res, err
