@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"regexp"
@@ -164,14 +165,16 @@ func checkUrl(urlId int, config Config, wg *sync.WaitGroup) {
 		}
 
 		for headerName, tag := range config.HTTPHeaderTags {
-			headerValues, foundHeader := res.Header[headerName]
+			fixedHeader := textproto.CanonicalMIMEHeaderKey(headerName)
+			headerValues, foundHeader := res.Header[fixedHeader]
 			if foundHeader && len(headerValues) > 0 {
 				tags[tag] = strings.Join(headerValues, " ")
 			}
 		}
 
 		for headerName, metric := range config.HTTPHeaderMetrics {
-			headerValues, foundHeader := res.Header[headerName]
+			fixedHeader := textproto.CanonicalMIMEHeaderKey(headerName)
+			headerValues, foundHeader := res.Header[fixedHeader]
 			if foundHeader && len(headerValues) > 0 {
 				metrics[metric] = strings.Join(headerValues, " ")
 			}
