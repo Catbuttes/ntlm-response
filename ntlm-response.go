@@ -114,7 +114,11 @@ func checkUrl(urlId int, config Config, wg *sync.WaitGroup) {
 	//req.SetBasicAuth(config.Username, config.Password)
 
 	for key, value := range config.Headers {
-		req.Header.Add(key, value)
+		if strings.ToLower(key) == "host" {
+			req.Host = value
+		} else {
+			req.Header.Add(key, value)
+		}
 	}
 
 	if config.Body != "" {
