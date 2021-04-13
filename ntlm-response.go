@@ -86,7 +86,9 @@ func checkUrl(urlId int, config Config, wg *sync.WaitGroup) {
 
 	proxyURL, err := url.Parse(config.HTTPProxy)
 	if err != nil {
-
+		fmt.Print(err)
+		fmt.Println("")
+		os.Exit(-1)
 	}
 
 	proxy := func(r *http.Request) (*url.URL, error) {
@@ -116,9 +118,9 @@ func checkUrl(urlId int, config Config, wg *sync.WaitGroup) {
 	for key, value := range config.Headers {
 		if strings.ToLower(key) == "host" {
 			req.Host = value
-		} else {
-			req.Header.Add(key, value)
 		}
+		req.Header.Add(key, value)
+
 	}
 
 	if config.Body != "" {
