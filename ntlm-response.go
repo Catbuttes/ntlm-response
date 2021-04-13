@@ -265,7 +265,7 @@ func loadConfig() Config {
 
 	flag.Parse()
 
-	if *help == true {
+	if *help {
 		displayHelp()
 		os.Exit(0)
 	}
