@@ -42,7 +42,7 @@ func (m authenicateMessage) MarshalBinary() ([]byte, error) {
 	}
 
 	target, user := toUnicode(m.TargetName), toUnicode(m.UserName)
-	workstation := toUnicode("")
+	workstation := toUnicode("go-ntlmssp")
 
 	ptr := binary.Size(&authenticateMessageFields{})
 	f := authenticateMessageFields{
